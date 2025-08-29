@@ -1,0 +1,5 @@
+streamlit
+pycaret==3.3.2
+pandas
+scikit-learn
+mlflow
