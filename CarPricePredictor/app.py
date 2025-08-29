@@ -12,7 +12,7 @@ st.set_page_config(page_title="Melbourne House Price Predictor", page_icon="🏠
 # Load trained PyCaret pipeline
 @st.cache_resource(show_spinner=False)
 def get_model():
-    return load_model("CarPricePredictor/melbourne_price_pipeline.pkl")
+    return load_model(r'CarPricePredictor/melbourne_price_pipeline')
 
 model = get_model()
 
