@@ -32,10 +32,10 @@ def load_wheat_classifier_model():
     return load_clf_model("WheatAppClassifier/wheat_classifier")
 
 # -------------- Sidebar navigation -----------------------------------
-st.sidebar.title("📚 ML Playground")
+st.sidebar.title("IT3385 Assignment")
 page = st.sidebar.radio(
     "Choose an app:",
-    ["🚗 Used Car Price", "🏠 Melbourne House Price", "🌾 Wheat Type Classifier"],
+    ["🚗 Used Car Price Predictor", "🏠 Melbourne House Price Predictor", "🌾 Wheat Type Classifier"],
     label_visibility="collapsed"
 )
 
