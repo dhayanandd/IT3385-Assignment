@@ -6,7 +6,7 @@ import pandas as pd
 # Load trained pipeline
 @st.cache_resource
 def load_model():
-    return joblib.load("CarPricePredictor/my_pipeline_ck")
+    return joblib.load(r'CarPricePredictor/my_pipeline_ck')
 
 model = load_model()
 
@@ -295,3 +295,4 @@ elif prediction_type == "Batch":
     else:
 
         st.info("Please upload a CSV or Excel file to get started with batch predictions.")
+
