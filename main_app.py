@@ -304,6 +304,8 @@ else:
     st.header("Wheat Type Classification")
 
     wheat_model = load_wheat_classifier_model()
+    # Mode selection
+    mode = st.radio("Choose input mode:", ["Enter all features", "Use Length + Width + Groove calculator"])
     if mode == "Enter all features":
         area = st.number_input("Area", min_value=0.0)
         perimeter = st.number_input("Perimeter", min_value=0.0)
