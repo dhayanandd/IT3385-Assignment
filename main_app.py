@@ -1,301 +1,346 @@
-# App to predict used car prices using a trained ML pipeline with Streamlit
-import streamlit as st
-import joblib
+# app.py — Unified ML App (Car Price • House Price • Wheat Classifier)
+# ---------------------------------------------------------------
+# Place your models in these relative paths:
+#   CarPricePredictor/my_pipeline_ck.pkl (or PyCaret base name)
+#   HousingPricePredictor/melbourne_price_pipeline.pkl (or base name)
+#   WheatAppClassifier/wheat_classifier.pkl (or base name)
+# ---------------------------------------------------------------
+
+import os
+import numpy as np
 import pandas as pd
-from pycaret.regression import load_model, predict_model
+import streamlit as st
 
-# Load trained pipeline
+# PyCaret imports (regression & classification)
+from pycaret.regression import load_model as load_reg_model, predict_model as predict_reg
+from pycaret.classification import load_model as load_clf_model, predict_model as predict_clf
+
+st.set_page_config(page_title="Unified ML App", page_icon="🤖", layout="centered")
+
+# -------------- Helpers: robust model loaders (cached) ----------------
 @st.cache_resource(show_spinner=False)
-def get_model():
-    return load_model("CarPricePredictor/my_pipeline_ck")
+def load_car_price_model():
+    # Use the same name you used in save_model; PyCaret accepts base name or .pkl
+    return load_reg_model("CarPricePredictor/my_pipeline_ck")
 
-model = get_model()
+@st.cache_resource(show_spinner=False)
+def load_house_price_model():
+    return load_reg_model("HousingPricePredictor/melbourne_price_pipeline")
 
-st.header("Predict Used Car Price (In INR/Lakh)")
-st.write("This web application predicts the price of a used car based on various features listed below. Please note that you can only select the years between 1998 and 2019 for the year or edition of the car model as the training data only includes year in that range in order for the prediction to be as accurate as possible.\n")
+@st.cache_resource(show_spinner=False)
+def load_wheat_classifier_model():
+    return load_clf_model("WheatAppClassifier/wheat_classifier")
 
-# Add dropdown box to choose real-time prediction request type (single or batch)
-st.subheader("Please Choose Prediction Request Type")
-
-prediction_type = st.selectbox(
-    "",
-    ("Single", "Batch"),
-    label_visibility="collapsed"  # Hides the empty label without affecting layout
+# -------------- Sidebar navigation -----------------------------------
+st.sidebar.title("📚 ML Playground")
+page = st.sidebar.radio(
+    "Choose an app:",
+    ["🚗 Used Car Price", "🏠 Melbourne House Price", "🌾 Wheat Type Classifier"],
+    label_visibility="collapsed"
 )
 
-# Single Prediction
-if prediction_type == "Single":
-    st.subheader("Single Prediction")
-    st.subheader("Please Insert the Details of the Car Below:")
-
-    # Input fields for all features except Brand_Model
-    location = st.text_input("Location (The location in which the car is being sold or is available for purchase)")
-    year = st.number_input("Year (The year or edition of the model) (Please select between 1998 and 2019)", min_value=1998, max_value=2019, step=1)
-    kilometers_driven = st.number_input("Kilometers Driven (The total kilometres driven in the car by the previous owner(s) in KM)", min_value=0)
-    fuel_type = st.selectbox("Fuel Type (The type of fuel used by the car)", ("Petrol", "Diesel", "Electric", "CNG", "LPG"))
-    transmission = st.selectbox("Transmission (The type of transmission used by the car)", ("Automatic", "Manual"))
-    owner_type = st.selectbox("Owner Type (Whether the ownership is Firsthand, Second hand or other)", ("First", "Second", "Third", "Fourth & Above"))
-
-    # Accept mileage as text input to handle float values and then convert to float, shows error message if the user inputs alphabets
-    mileage_input = st.text_input("Mileage (The standard mileage offered by the car company in kilometers per liter (kmpl) or kilometers per kilogram (km/kg))")
-
-    try:
-        mileage = float(mileage_input) if mileage_input else None
-    except ValueError:
-        st.error("Please enter a valid decimal number for mileage.")
-
-    engine = st.number_input("Engine (The displacement volume of the engine in cubic centimeter (cc))", min_value=0)
-
-    # Accept power as text input to handle float values and then convert to float, shows error message if the user inputs alphabets
-    power_input = st.text_input("Power (The maximum power of the engine in brake horsepower (bhp))")
-
-    try:
-        power = float(power_input) if power_input else None
-    except ValueError:
-        st.error("Please enter a valid decimal number for power.")
-
-    seats = st.number_input("Seats (The number of seats in the car) (Please select between 1 and 10 inclusive)", min_value=1, max_value=10, step=1)
-
-    # Custom CSS for Predict button
-    st.markdown(
-        """
-        <style>
-        div.stButton > button:first-child {
-            background-color: blue;
-            color: white;
-            font-size: 18px;
-            border-radius: 10px;
-            height: 3em;
-            width: 100%;
-        }
-        div.stButton > button:hover {
-            background-color: #4169E1;
-            color: white;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
+# =====================================================================
+# 🚗 CAR PRICE PREDICTOR
+# =====================================================================
+if page.startswith("🚗"):
+    st.header("Predict Used Car Price (INR / Lakh)")
+    st.write(
+        "This web app predicts the price of a used car. "
+        "Please note the **Year** must be between **1998–2019** (matches training data)."
     )
 
-    if st.button("🚗 Predict Price"):
-        # Validation for location
-        if not location.strip():
-            st.error("Please enter a location.")
-            st.stop()
-        
-        # Collect input features into DataFrame
-        input_data = pd.DataFrame([{
-            "Location": location,
-            "Year": year,
-            "Kilometers_Driven": kilometers_driven,
-            "Fuel_Type": fuel_type,
-            "Transmission": transmission,
-            "Owner_Type": owner_type,
-            "Mileage": mileage,
-            "Engine": engine,
-            "Power": power,
-            "Seats": seats
+    # Load model once
+    car_model = load_car_price_model()
+
+    st.subheader("Prediction Mode")
+    mode = st.selectbox("", ["Single", "Batch"], label_visibility="collapsed")
+
+    # ---------------- Single
+    if mode == "Single":
+        st.subheader("Single Prediction")
+        st.caption("Fill in the car details, then click Predict.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            location = st.text_input("Location")
+            year = st.number_input("Year (1998–2019)", min_value=1998, max_value=2019, value=2015, step=1)
+            kilometers_driven = st.number_input("Kilometers Driven (KM)", min_value=0, value=40000, step=100)
+            fuel_type = st.selectbox("Fuel Type", ["Petrol", "Diesel", "Electric", "CNG", "LPG"])
+            transmission = st.selectbox("Transmission", ["Automatic", "Manual"])
+        with col2:
+            owner_type = st.selectbox("Owner Type", ["First", "Second", "Third", "Fourth & Above"])
+            mileage_input = st.text_input("Mileage (kmpl or km/kg)", value="18.0")
+            engine = st.number_input("Engine (cc)", min_value=0, value=1197, step=10)
+            power_input = st.text_input("Power (bhp)", value="82.0")
+            seats = st.number_input("Seats (1–10)", min_value=1, max_value=10, value=5, step=1)
+
+        # Parse floats safely
+        def _to_float(x):
+            try:
+                return float(x)
+            except Exception:
+                return None
+
+        mileage = _to_float(mileage_input)
+        power = _to_float(power_input)
+
+        st.markdown(
+            """
+            <style>
+            div.stButton > button:first-child {
+                background-color: #2563EB; color: white; font-size: 16px;
+                border-radius: 10px; height: 3em; width: 100%;
+            }
+            div.stButton > button:hover { background-color: #1D4ED8; color: white; }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+        if st.button("🚗 Predict Price"):
+            if not location.strip():
+                st.error("Please enter a location.")
+                st.stop()
+            if mileage is None:
+                st.error("Mileage must be a number (e.g., 18.0).")
+                st.stop()
+            if power is None:
+                st.error("Power must be a number (e.g., 82.0).")
+                st.stop()
+
+            X = pd.DataFrame([{
+                "Location": location.strip(),
+                "Year": int(year),
+                "Kilometers_Driven": int(kilometers_driven),
+                "Fuel_Type": fuel_type,
+                "Transmission": transmission,
+                "Owner_Type": owner_type,
+                "Mileage": mileage,
+                "Engine": int(engine),
+                "Power": power,
+                "Seats": int(seats)
+            }])
+
+            try:
+                preds = predict_reg(car_model, data=X)
+                # Find prediction column (PyCaret adds columns)
+                added = [c for c in preds.columns if c not in X.columns]
+                prefer = ["Label", "prediction_label", "Prediction", "Predicted", "Score"]
+                pred_col = next((c for c in prefer if c in preds.columns), added[0] if added else None)
+                if pred_col is None:
+                    raise ValueError(f"No prediction column found. Columns: {list(preds.columns)}")
+                price = float(preds[pred_col].iloc[0])
+                st.success(f"Predicted Price: **{price:.2f} Lakh (INR)**")
+                with st.expander("See input & output (debug)"):
+                    st.dataframe(preds, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error while predicting: {e}")
+
+    # ---------------- Batch
+    else:
+        st.subheader("Batch Prediction")
+        st.write("Upload a CSV/XLSX with the following columns:")
+        expected = [
+            "Location", "Year", "Kilometers_Driven", "Fuel_Type",
+            "Transmission", "Owner_Type", "Mileage", "Engine", "Power", "Seats"
+        ]
+        st.code(", ".join(expected))
+
+        file = st.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx", "xls"])
+
+        # Clear state if needed
+        if file is None:
+            st.session_state.pop("car_df_results", None)
+        else:
+            try:
+                ext = file.name.split(".")[-1].lower()
+                if ext == "csv":
+                    df = pd.read_csv(file)
+                else:
+                    df = pd.read_excel(file)
+                st.write(f"Total records: {len(df)}")
+                st.dataframe(df.head())
+
+                missing = [c for c in expected if c not in df.columns]
+                if missing:
+                    st.error(f"Missing required columns: {missing}")
+                else:
+                    # quick validations
+                    issues = []
+                    invalid_years = df[(df["Year"] < 1998) | (df["Year"] > 2019)]
+                    if not invalid_years.empty:
+                        issues.append(f"{len(invalid_years)} rows have invalid Year (1998–2019).")
+                    invalid_seats = df[(df["Seats"] < 1) | (df["Seats"] > 10)]
+                    if not invalid_seats.empty:
+                        issues.append(f"{len(invalid_seats)} rows have invalid Seats (1–10).")
+                    if df[expected].isnull().sum().sum() > 0:
+                        issues.append("Some required fields are missing (NaNs).")
+
+                    if issues:
+                        st.warning("Validation issues:\n- " + "\n- ".join(issues))
+                    if st.button("🚗 Predict All Prices"):
+                        if issues:
+                            st.error("Fix validation issues before predicting.")
+                        else:
+                            with st.spinner("Predicting..."):
+                                preds = predict_reg(car_model, data=df[expected])
+                                # locate prediction column
+                                added = [c for c in preds.columns if c not in df.columns]
+                                prefer = ["Label", "prediction_label", "Prediction", "Predicted", "Score"]
+                                pred_col = next((c for c in prefer if c in preds.columns), added[0] if added else None)
+                                if pred_col is None:
+                                    raise ValueError("No prediction column produced.")
+                                out = df.copy()
+                                out["Predicted_Price_Lakh"] = preds[pred_col].round(2).values
+                                st.session_state["car_df_results"] = out
+
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+
+        if "car_df_results" in st.session_state:
+            st.subheader("Prediction Results")
+            out = st.session_state["car_df_results"]
+            st.dataframe(out, use_container_width=True)
+            st.markdown("#### Summary")
+            col1, col2, col3 = st.columns(3)
+            vals = out["Predicted_Price_Lakh"].values
+            with col1: st.metric("Average (Lakh)", f"{np.mean(vals):.2f}")
+            with col2: st.metric("Min (Lakh)", f"{np.min(vals):.2f}")
+            with col3: st.metric("Max (Lakh)", f"{np.max(vals):.2f}")
+
+            csv = out.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                data=csv,
+                file_name="car_price_predictions.csv",
+                mime="text/csv"
+            )
+
+# =====================================================================
+# 🏠 MELBOURNE HOUSE PRICE PREDICTOR
+# =====================================================================
+elif page.startswith("🏠"):
+    st.header("Melbourne House Price Predictor")
+    st.caption("Enter details on the left and click Predict.")
+
+    house_model = load_house_price_model()
+
+    st.sidebar.header("Property Inputs")
+    Rooms = st.sidebar.number_input("Rooms", min_value=0, value=3, step=1)
+    Bedroom2 = st.sidebar.number_input("Bedroom2 (scraped)", min_value=0, value=3, step=1)
+    Bathroom = st.sidebar.number_input("Bathroom", min_value=0, value=2, step=1)
+    Car = st.sidebar.number_input("Car Spaces", min_value=0, value=1, step=1)
+
+    Distance = st.sidebar.number_input("Distance to CBD (km)", min_value=0.0, value=10.0, step=0.1)
+    Landsize = st.sidebar.number_input("Landsize (sqm)", min_value=0.0, value=450.0, step=10.0)
+    BuildingArea = st.sidebar.number_input("Building Area (sqm)", min_value=0.0, value=120.0, step=5.0)
+
+    YearBuilt = st.sidebar.number_input("Year Built", min_value=1800, max_value=2025, value=1998, step=1)
+    Propertycount = st.sidebar.number_input("Propertycount (in suburb)", min_value=0, value=6000, step=50)
+
+    SaleYear = st.sidebar.number_input("Sale Year", min_value=2007, max_value=2025, value=2017, step=1)
+    SaleMonth = st.sidebar.slider("Sale Month", min_value=1, max_value=12, value=6)
+
+    Method = st.sidebar.selectbox("Sale Method", options=["S", "Other"], index=0)
+    Type = st.sidebar.selectbox("Property Type", options=['h', 'u', 't', 'dev site', 'o res'], index=0)
+    Region = st.sidebar.text_input("Region (or 'Other')", value="Other")
+    CouncilArea = st.sidebar.text_input("Council Area (or 'Other')", value="Other")
+    Suburb = st.sidebar.text_input("Suburb (or 'Other')", value="Other")
+
+    use_location = st.sidebar.checkbox("Provide Latitude/Longitude?", value=False)
+    if use_location:
+        Latitude = st.sidebar.number_input("Latitude", value=-37.80, step=0.01, format="%.5f")
+        Longitude = st.sidebar.number_input("Longitude", value=145.00, step=0.01, format="%.5f")
+    else:
+        Latitude = -37.80
+        Longitude = 145.00
+
+    def build_house_row():
+        property_age = max(0, int(SaleYear) - int(YearBuilt)) if YearBuilt > 0 else 0
+        return pd.DataFrame([{
+            'Rooms': int(Rooms),
+            'Bedroom2': int(Bedroom2),
+            'Bathroom': int(Bathroom),
+            'Car': int(Car),
+            'Distance': float(Distance),
+            'Landsize': float(Landsize),
+            'BuildingArea': float(BuildingArea),
+            'YearBuilt': float(YearBuilt),
+            'CouncilArea': CouncilArea.strip() or 'Other',
+            'Region': Region.strip() or 'Other',
+            'Suburb': Suburb.strip() or 'Other',
+            'Method': Method,
+            'Type': Type,
+            'Propertycount': int(Propertycount),
+            'SaleYear': int(SaleYear),
+            'SaleMonth': int(SaleMonth),
+            'PropertyAge': int(property_age),
+            'Latitude': float(Latitude),
+            'Longitude': float(Longitude),
+
+            # placeholders to match training schema (safe)
+            'Price_per_sqm': np.nan,
+            'Address': 'Unknown',
+            'Seller': 'Other',
+            'Postcode': '3000',
+            'Date': '2017-06-15',
+            'LogPrice': 0.0
         }])
 
-        # Make prediction using pipeline
+    st.subheader("Enter details, then click Predict")
+    if st.button("Predict Price", type="primary", use_container_width=True):
+        X = build_house_row()
         try:
-            prediction = model.predict(input_data)
-            st.success(f"Predicted Price is {prediction[0]:.2f} Lakh in Indian Rupees (INR).")
+            preds = predict_reg(house_model, data=X)
+            added = [c for c in preds.columns if c not in X.columns]
+            prefer = ['Label', 'prediction_label', 'Prediction', 'Predicted', 'Score']
+            pred_col = next((c for c in prefer if c in preds.columns), added[0] if added else None)
+            if pred_col is None:
+                raise ValueError(f"No prediction column. Columns: {list(preds.columns)}")
+            price = float(preds[pred_col].iloc[0])
+            st.success(f"**Predicted Price:** ${price:,.0f}")
+            with st.expander("See input & output (debug)"):
+                st.write("Prediction column:", pred_col)
+                st.dataframe(preds, use_container_width=True)
         except Exception as e:
-            st.error(f"Error while predicting: {e}")
+            st.error(f"Prediction failed: {e}")
 
-# Batch Prediction
-elif prediction_type == "Batch":
-    st.subheader("Batch Prediction")
-    st.write("Upload a CSV or Excel file containing car details for multiple predictions. The file should contain the following columns:")
-    
-    # Display expected columns with descriptions matching real-time inputs
-    expected_columns = [
-        "Location", "Year", "Kilometers_Driven", "Fuel_Type", 
-        "Transmission", "Owner_Type", "Mileage", "Engine", "Power", "Seats"
-    ]
-    
-    column_descriptions = [
-        "Location (The location in which the car is being sold or is available for purchase)",
-        "Year (The year or edition of the model) (1998-2019)",
-        "Kilometers_Driven (The total kilometres driven in the car by the previous owner(s) in KM)",
-        "Fuel_Type (The type of fuel used by the car)",
-        "Transmission (The type of transmission used by the car)",
-        "Owner_Type (Whether the ownership is Firsthand, Second hand or other)",
-        "Mileage (The standard mileage offered by the car company in kilometers per liter (kmpl) or kilometers per kilogram (km/kg))",
-        "Engine (The displacement volume of the engine in cubic centimeter (cc))",
-        "Power (The maximum power of the engine in brake horsepower (bhp))",
-        "Seats (The number of seats in the car) (1-10 inclusive)"
-    ]
-    
-    st.write("**Required columns:**")
-    for i, desc in enumerate(column_descriptions, 1):
-        st.write(f"{i}. {desc}")
-    
-    st.write("**Important notes:**")
-    st.write("- Year should be between 1998-2019 inclusive.")
-    st.write("- Seats should be between 1-10 inclusive.") 
-    st.write("- Fuel_Type should be one of these types: Petrol, Diesel, Electric, CNG, LPG.")
-    st.write("- Transmission should be either Manual or Automatic.")
-    st.write("- Owner_Type should be one of these types: First, Second, Third, Fourth & Above.")
-    
-    # File uploader
-    uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx", "xls"])
-    
-    # Clear previous results when no file is uploaded or when a new file is uploaded
-    if uploaded_file is None:
-        # Clear session state when file is removed
-        if 'prediction_results' in st.session_state:
-            del st.session_state['prediction_results']
-        if 'predictions' in st.session_state:
-            del st.session_state['predictions']
-        if 'current_file_name' in st.session_state:
-            del st.session_state['current_file_name']
-    else:
-        # Clear session state when a different file is uploaded
-        if 'current_file_name' in st.session_state and st.session_state['current_file_name'] != uploaded_file.name:
-            if 'prediction_results' in st.session_state:
-                del st.session_state['prediction_results']
-            if 'predictions' in st.session_state:
-                del st.session_state['predictions']
-        
-        # Store current file name
-        st.session_state['current_file_name'] = uploaded_file.name
-    
-    if uploaded_file is not None:
+# =====================================================================
+# 🌾 WHEAT CLASSIFIER
+# =====================================================================
+else:
+    st.header("Wheat Type Classification")
+
+    wheat_model = load_wheat_classifier_model()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        area = st.number_input("Area", min_value=0.0, value=15.0)
+        perimeter = st.number_input("Perimeter", min_value=0.0, value=14.0)
+        compactness = st.number_input("Compactness", min_value=0.0, value=0.87)
+    with col2:
+        asymmetry_coeff = st.number_input("Asymmetry Coefficient", min_value=0.0, value=2.0)
+        groove = st.number_input("Groove", min_value=0.0, value=5.2)
+
+    if st.button("Predict Wheat Type", type="primary"):
+        X = pd.DataFrame([{
+            'Area': area,
+            'Perimeter': perimeter,
+            'Compactness': compactness,
+            'AsymmetryCoeff': asymmetry_coeff,
+            'Groove': groove
+        }])
         try:
-            # Read the uploaded file based on its extension
-            file_extension = uploaded_file.name.split('.')[-1].lower()
-            
-            if file_extension == 'csv':
-                df = pd.read_csv(uploaded_file)
-            elif file_extension in ['xlsx', 'xls']:
-                df = pd.read_excel(uploaded_file)
-            else:
-                st.error("Unsupported file format. Please upload a CSV or Excel file.")
-                st.stop()
-            
-            st.subheader("Uploaded Data Preview")
-            st.write(f"Total records: {len(df)}")
-            st.dataframe(df.head())
-            
-            # Check if all required columns are present
-            missing_columns = [col for col in expected_columns if col not in df.columns]
-            
-            if missing_columns:
-                st.error(f"Missing required columns: {', '.join(missing_columns)}")
-            else:
-                # Validate data ranges
-                validation_errors = []
-                
-                # Check year range
-                invalid_years = df[(df['Year'] < 1998) | (df['Year'] > 2019)]
-                if not invalid_years.empty:
-                    validation_errors.append(f"Found {len(invalid_years)} records with invalid years (should be 1998-2019)")
-                
-                # Check seats range
-                invalid_seats = df[(df['Seats'] < 1) | (df['Seats'] > 10)]
-                if not invalid_seats.empty:
-                    validation_errors.append(f"Found {len(invalid_seats)} records with invalid seats (should be 1-10)")
-                
-                # Check for missing values in critical columns
-                missing_data = df[expected_columns].isnull().sum()
-                cols_with_missing = missing_data[missing_data > 0]
-                if not cols_with_missing.empty:
-                    validation_errors.append(f"Missing data found in columns: {dict(cols_with_missing)}")
-                
-                if validation_errors:
-                    st.warning("Data validation issues found:")
-                    for error in validation_errors:
-                        st.warning(f"{error}")
-                    st.write("Please fix the data issues before proceeding with predictions.")
-                else:
-                    st.success("Data is successfully validated. You can now proceed to make predictions.")
-                
-                # Custom CSS for Predict button (same as single prediction)
-                st.markdown(
-                    """
-                    <style>
-                    div.stButton > button:first-child {
-                        background-color: blue;
-                        color: white;
-                        font-size: 18px;
-                        border-radius: 10px;
-                        height: 3em;
-                        width: 100%;
-                    }
-                    div.stButton > button:hover {
-                        background-color: #4169E1;
-                        color: white;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
-                 
-                # Predict button for batch prediction
-                if st.button("🚗 Predict All Prices"):
-                    if validation_errors:
-                        st.error("Cannot proceed with predictions due to data validation errors.")
-                    else:
-                        try:
-                            # Make predictions for all records
-                            with st.spinner("Making predictions..."):
-                                predictions = model.predict(df[expected_columns])
-                            
-                            # Add predictions to the dataframe
-                            df_results = df.copy()
-                            df_results['Predicted_Price_Lakh'] = predictions.round(2)
-                            
-                            # Store results in session state to persist across reruns
-                            st.session_state['prediction_results'] = df_results
-                            st.session_state['predictions'] = predictions
-                            
-                        except Exception as e:
-                            st.error(f"Error during prediction: {e}")
-                
-                # Display results if they exist in session state
-                if 'prediction_results' in st.session_state and 'predictions' in st.session_state:
-                    df_results = st.session_state['prediction_results']
-                    predictions = st.session_state['predictions']
-                    
-                    st.subheader("Prediction Results")
-                    st.write(f"Successfully predicted prices for {len(df_results)} used cars.")
-                    
-                    # Display results
-                    st.dataframe(df_results)
-                    
-                    # Summary statistics - made smaller
-                    st.markdown("#### Summary Statistics")
-                    col1, col2, col3 = st.columns(3)
-                    
-                    with col1:
-                        st.metric(label="Average Price (INR/Lakh)", value=f"{predictions.mean():.2f}")
-
-                    with col2:
-                        st.metric(label="Minimum Price (INR/Lakh)", value=f"{predictions.min():.2f}")
-
-                    with col3:
-                        st.metric(label="Maximum Price (INR/Lakh)", value=f"{predictions.max():.2f}")
-
-                    
-                    # Download results
-                    csv = df_results.to_csv(index=False)
-                    st.download_button(
-                        label="Download Results as CSV",
-                        data=csv,
-                        file_name="Used_Car_Price_Predictions.csv",
-                        mime="text/csv",
-                        key="download_csv"
-                    )
-        
+            preds = predict_clf(wheat_model, data=X)
+            # PyCaret classification usually adds 'prediction_label'
+            label_col = 'prediction_label' if 'prediction_label' in preds.columns else 'Label'
+            pred_class = preds.loc[0, label_col]
+            st.success(f"Predicted Wheat Type: **{pred_class}**")
+            with st.expander("See input & output (debug)"):
+                st.dataframe(preds, use_container_width=True)
         except Exception as e:
-            st.error(f"Error reading CSV file: {e}")
-            st.write("Please make sure your file is in valid CSV or Excel file format.")
-    
-    else:
+            st.error(f"Prediction failed: {e}")
 
-        st.info("Please upload a CSV or Excel file to get started with batch predictions.")
-
-
-
+# ------------------- Footer -------------------
+st.markdown("---")
+st.caption("Unified app • PyCaret pipelines • Streamlit")
