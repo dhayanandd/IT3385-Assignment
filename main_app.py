@@ -1,11 +1,3 @@
-# app.py — Unified ML App (Car Price • House Price • Wheat Classifier)
-# ---------------------------------------------------------------
-# Place your models in these relative paths:
-#   CarPricePredictor/my_pipeline_ck.pkl (or PyCaret base name)
-#   HousingPricePredictor/melbourne_price_pipeline.pkl (or base name)
-#   WheatAppClassifier/wheat_classifier.pkl (or base name)
-# ---------------------------------------------------------------
-
 import os
 import numpy as np
 import pandas as pd
