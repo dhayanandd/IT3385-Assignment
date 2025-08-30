@@ -304,16 +304,33 @@ else:
     st.header("Wheat Type Classification")
 
     wheat_model = load_wheat_classifier_model()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        area = st.number_input("Area", min_value=0.0, value=15.0)
-        perimeter = st.number_input("Perimeter", min_value=0.0, value=14.0)
-        compactness = st.number_input("Compactness", min_value=0.0, value=0.87)
-    with col2:
-        asymmetry_coeff = st.number_input("Asymmetry Coefficient", min_value=0.0, value=2.0)
-        groove = st.number_input("Groove", min_value=0.0, value=5.2)
-
+    if mode == "Enter all features":
+        area = st.number_input("Area", min_value=0.0)
+        perimeter = st.number_input("Perimeter", min_value=0.0)
+        compactness = st.number_input("Compactness", min_value=0.0)
+        asymmetry = st.number_input("Asymmetry Coefficient", min_value=0.0)
+        groove = st.number_input("Groove Length", min_value=0.0)
+    
+    else:
+        # Calculator mode
+        length = st.number_input("Length", min_value=0.0)
+        width = st.number_input("Width", min_value=0.0)
+        groove = st.number_input("Groove Length", min_value=0.0)
+        area = st.number_input("Area", min_value=0.0)
+        asymmetry = st.number_input("Asymmetry Coefficient", min_value=0.0)
+    
+        # Compute perimeter and compactness
+        perimeter = length + width + groove
+        compactness = (4 * np.pi * area) / (perimeter ** 2) if perimeter > 0 else 0
+    
+        st.write(f"📏 Calculated Perimeter: **{perimeter:.3f}**")
+        st.write(f"⚙️ Calculated Compactness: **{compactness:.3f}**")
+    
+        # Disclaimer
+        st.warning(
+            "⚠️ Disclaimer: Perimeter and compactness are estimated using simplified formulas. "
+            "Actual seed geometry may differ, so results may not be exact."
+        )
     if st.button("Predict Wheat Type", type="primary"):
         X = pd.DataFrame([{
             'Area': area,
