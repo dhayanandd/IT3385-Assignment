@@ -4,11 +4,11 @@ import joblib
 import pandas as pd
 
 # Load trained pipeline
-@st.cache_resource
-def load_model():
-    return joblib.load(r'CarPricePredictor/my_pipeline_ck')
+@st.cache_resource(show_spinner=False)
+def get_model():
+    return load_model("CarPricePredictor/my_pipeline_ck")
 
-model = load_model()
+model = get_model()
 
 st.header("Predict Used Car Price (In INR/Lakh)")
 st.write("This web application predicts the price of a used car based on various features listed below. Please note that you can only select the years between 1998 and 2019 for the year or edition of the car model as the training data only includes year in that range in order for the prediction to be as accurate as possible.\n")
@@ -295,4 +295,5 @@ elif prediction_type == "Batch":
     else:
 
         st.info("Please upload a CSV or Excel file to get started with batch predictions.")
+
 
