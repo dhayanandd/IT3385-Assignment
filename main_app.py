@@ -338,7 +338,7 @@ else:
             'Area': area,
             'Perimeter': perimeter,
             'Compactness': compactness,
-            'AsymmetryCoeff': asymmetry_coeff,
+            'AsymmetryCoeff': asymmetry,
             'Groove': groove
         }])
         try:
