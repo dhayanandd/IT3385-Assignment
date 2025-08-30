@@ -2,6 +2,7 @@
 import streamlit as st
 import joblib
 import pandas as pd
+from pycaret.regression import load_model, predict_model
 
 # Load trained pipeline
 @st.cache_resource(show_spinner=False)
@@ -295,5 +296,6 @@ elif prediction_type == "Batch":
     else:
 
         st.info("Please upload a CSV or Excel file to get started with batch predictions.")
+
 
 
