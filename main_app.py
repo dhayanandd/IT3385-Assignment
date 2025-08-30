@@ -9,10 +9,8 @@ from pycaret.classification import load_model as load_clf_model, predict_model a
 
 st.set_page_config(page_title="Unified ML App", page_icon="🤖", layout="centered")
 
-# -------------- Helpers: robust model loaders (cached) ----------------
 @st.cache_resource(show_spinner=False)
 def load_car_price_model():
-    # Use the same name you used in save_model; PyCaret accepts base name or .pkl
     return load_reg_model("CarPricePredictor/my_pipeline_ck")
 
 @st.cache_resource(show_spinner=False)
@@ -23,17 +21,16 @@ def load_house_price_model():
 def load_wheat_classifier_model():
     return load_clf_model("WheatAppClassifier/wheat_classifier")
 
-# -------------- Sidebar navigation -----------------------------------
-st.sidebar.title("📚 ML Playground")
+# Sidebar navigation
+st.sidebar.title("IT3385 Assignment")
 page = st.sidebar.radio(
     "Choose an app:",
-    ["🚗 Used Car Price", "🏠 Melbourne House Price", "🌾 Wheat Type Classifier"],
+    ["Used Car Price Predictor", "Melbourne House Price Predictor", "Wheat Type Classifier"],
     label_visibility="collapsed"
 )
 
-# =====================================================================
-# 🚗 CAR PRICE PREDICTOR
-# =====================================================================
+
+#  CAR PRICE PREDICTOR
 if page.startswith("🚗"):
     st.header("Predict Used Car Price (INR / Lakh)")
     st.write(
@@ -47,7 +44,7 @@ if page.startswith("🚗"):
     st.subheader("Prediction Mode")
     mode = st.selectbox("", ["Single", "Batch"], label_visibility="collapsed")
 
-    # ---------------- Single
+    #  Single
     if mode == "Single":
         st.subheader("Single Prediction")
         st.caption("Fill in the car details, then click Predict.")
@@ -208,9 +205,8 @@ if page.startswith("🚗"):
                 mime="text/csv"
             )
 
-# =====================================================================
+
 # 🏠 MELBOURNE HOUSE PRICE PREDICTOR
-# =====================================================================
 elif page.startswith("🏠"):
     st.header("Melbourne House Price Predictor")
     st.caption("Enter details on the left and click Predict.")
@@ -297,9 +293,8 @@ elif page.startswith("🏠"):
         except Exception as e:
             st.error(f"Prediction failed: {e}")
 
-# =====================================================================
+
 # 🌾 WHEAT CLASSIFIER
-# =====================================================================
 else:
     st.header("Wheat Type Classification")
 
@@ -333,6 +328,6 @@ else:
         except Exception as e:
             st.error(f"Prediction failed: {e}")
 
-# ------------------- Footer -------------------
+# Footer
 st.markdown("---")
 st.caption("Unified app • PyCaret pipelines • Streamlit")
